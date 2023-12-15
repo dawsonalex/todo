@@ -1,0 +1,48 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17
+
+      - name: Test
+        run: go test -v ./...
+
+      - name: Compile
+        run: make release
+
+      - name: Bump version and push tag
+        id: bump_version
+        uses: anothrNick/github-tag-action@1.36.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WITH_V: false
+          DEFAULT_BUMP: none
+
+      - name: Changelog
+        uses: Bullrich/generate-release-changelog@master
+        id: changelog
+        env:
+          REPO: ${{ github.repository }}
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: ${{ steps.bump_version.outputs.part != '' }}
+        with:
+          tag_name: ${{ steps.bump_version.outputs.new_tag }}
+          body: |
+            ${{ steps.changelog.outputs.changelog }}
+          files: bin/**
