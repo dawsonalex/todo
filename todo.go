@@ -17,9 +17,23 @@ func Message(message string) WritableProperty {
 	}
 }
 
-func DoneStatus(status bool) WritableProperty {
+func ToggleDone() WritableProperty {
 	return func(item Item) Item {
-		item.Done = status
+		item.Done = !item.Done
+		return item
+	}
+}
+
+func Done() WritableProperty {
+	return func(item Item) Item {
+		item.Done = true
+		return item
+	}
+}
+
+func NotDone() WritableProperty {
+	return func(item Item) Item {
+		item.Done = false
 		return item
 	}
 }
@@ -37,10 +51,17 @@ type itemList []*Item
 
 type List struct {
 	sync.RWMutex
+	// todo: this could do with indexing based on message and date at some point
 	list itemList
 }
 
 func NewListFromDeserialised(serialisedList string) *List {
+	if len(serialisedList) == 0 {
+		return &List{
+			list: make(itemList, 0),
+		}
+	}
+
 	serialisedItems := strings.Split(serialisedList, "\n")
 	list := List{
 		list: make(itemList, len(serialisedItems)),
@@ -82,7 +103,7 @@ func (l *List) Add(properties ...WritableProperty) Item {
 	for _, property := range properties {
 		item = property(item)
 	}
-	l.list[len(l.list)] = &item
+	l.list = append(l.list, &item)
 	return item
 }
 
@@ -96,6 +117,14 @@ func (l *List) Remove(id Id) {
 func (l *List) Get(id Id) (Item, bool) {
 	item, exists := l.get(id)
 	return *item, exists
+}
+
+func (l *List) GetAll() []Item {
+	items := make([]Item, len(l.list))
+	for i, item := range l.list {
+		items[i] = *item
+	}
+	return items
 }
 
 func (l *List) get(itemId Id) (*Item, bool) {
