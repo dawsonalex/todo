@@ -4,6 +4,10 @@ temp = $(subst /, ,$@)
 os = $(word 1, $(temp))
 arch = $(word 2, $(temp))
 
+.PHONY: run
+run:
+	go run cmd/*
+
 # Clean the build directory (before committing code, for example)
 .PHONY: clean
 clean: 
