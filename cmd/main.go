@@ -25,8 +25,8 @@ type item struct {
 	todo.Item
 }
 
-func (i item) Description() string { return i.Message }
-func (i item) FilterValue() string { return i.Message }
+func (i item) Description() string { return i.Description }
+func (i item) FilterValue() string { return i.Description }
 
 func main() {
 	todoList.Add(todo.Message("Go Shopping"), todo.Done())

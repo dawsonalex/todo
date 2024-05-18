@@ -50,7 +50,7 @@ func (delegate itemDelegate) Render(w io.Writer, m list.Model, index int, listIt
 		return
 	}
 
-	str := fmt.Sprintf("%d. %s", index+1, i.Message)
+	str := fmt.Sprintf("%d. %s", index+1, i.Description)
 
 	fn := itemStyle.Render
 	if index == m.Index() {
