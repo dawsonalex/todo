@@ -132,15 +132,16 @@ func (i *Item) UnmarshalText(text []byte) error {
 	// everything else is description with optional tags and context
 	i.Description = textString[nextPosition:]
 
-	projects, contexts := parseMessage(textString[nextPosition:])
+	projects, contexts, specialKeys := parseMessage(textString[nextPosition:])
 	i.Projects = projects
 	i.Contexts = contexts
+	i.SpecialKeys = specialKeys
 
 	return nil
 }
 
 // parseMessage parses a
-func parseMessage(message string) (projects []string, contexts []string) {
+func parseMessage(message string) (projects []string, contexts []string, specialKeys map[string]string) {
 	for _, word := range strings.Fields(message) {
 		if word[0] == '+' {
 			projects = append(projects, word[1:])
@@ -151,8 +152,15 @@ func parseMessage(message string) (projects []string, contexts []string) {
 			contexts = append(contexts, word[1:])
 			continue
 		}
+
+		if pos := strings.Index(word, ":"); pos != -1 {
+			if specialKeys == nil {
+				specialKeys = make(map[string]string)
+			}
+			specialKeys[word[:pos]] = word[pos+1:]
+		}
 	}
-	return projects, contexts
+	return projects, contexts, specialKeys
 }
 
 type itemList []*Item
