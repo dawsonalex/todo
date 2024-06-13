@@ -26,11 +26,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "enter", "space":
-			_, ok := m.list.SelectedItem().(item)
+			item, ok := m.list.SelectedItem().(item)
 			if ok {
 				// mark the item as done in the todoList
-				// TODO: for some reason this locks the app up.
-				//todoList.Update(todo.Id(m.list.Index()), todo.ToggleDone())
+				// TODO: this doesn't cause the UI to update for some reason.
+				item.Done = !item.Done
 			}
 		}
 	case tea.WindowSizeMsg:

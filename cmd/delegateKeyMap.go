@@ -1,6 +1,8 @@
 package main
 
-import "github.com/charmbracelet/bubbles/key"
+import (
+	"github.com/charmbracelet/bubbles/key"
+)
 
 type delegateKeyMap struct {
 	toggleDone key.Binding
@@ -9,9 +11,9 @@ type delegateKeyMap struct {
 func newDelegateKeyMap() *delegateKeyMap {
 	return &delegateKeyMap{
 		toggleDone: key.NewBinding(
-			key.WithKeys("enter", "space"),
+			key.WithKeys("enter", " "),
 			key.WithHelp("enter", "toggle done"),
-			key.WithHelp("space", "toggle done"),
+			key.WithHelp(" ", "toggle done"),
 		),
 	}
 }
