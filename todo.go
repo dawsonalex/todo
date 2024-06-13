@@ -13,7 +13,7 @@ type WritableProperty func(item Item) Item
 
 func Message(message string) WritableProperty {
 	return func(item Item) Item {
-		item.Description = message
+		item.Message = message
 		return item
 	}
 }
@@ -48,7 +48,7 @@ func (p Priority) Valid() bool {
 }
 
 type Item struct {
-	Description   string            `json:"description"`
+	Message       string            `json:"description"`
 	Done          bool              `json:"done"`
 	Priority      Priority          `json:"priority"`
 	CreatedDate   time.Time         `json:"created-date"`
@@ -69,7 +69,7 @@ func (i *Item) MarshalText() (text []byte, err error) {
 		textStr = textStr + i.CompletedDate.Format("2006-01-02") + " " + i.CreatedDate.Format("2006-01-02")
 	}
 
-	textStr = textStr + " " + i.Description
+	textStr = textStr + " " + i.Message
 
 	for _, project := range i.Projects {
 		textStr = textStr + " +" + project
@@ -130,7 +130,7 @@ func (i *Item) UnmarshalText(text []byte) error {
 	}
 
 	// everything else is description with optional tags and context
-	i.Description = textString[nextPosition:]
+	i.Message = textString[nextPosition:]
 
 	projects, contexts, specialKeys := parseMessage(textString[nextPosition:])
 	i.Projects = projects
@@ -188,7 +188,7 @@ func NewListFromDeserialised(serialisedList string) *List {
 		timestamp, _ := time.Parse(time.RFC3339, itemParts[2])
 		list.list[i] = &Item{
 			//Id:          Id(i),
-			Description: itemParts[0],
+			Message:     itemParts[0],
 			Done:        done,
 			CreatedDate: timestamp,
 		}
@@ -203,7 +203,7 @@ func NewListFromDeserialised(serialisedList string) *List {
 func (l *List) SerialiseToString() string {
 	var list string
 	for _, item := range l.list {
-		itemString := fmt.Sprintf("%s|%t|%s\n", item.Description, item.Done, item.CreatedDate.Format(time.RFC3339))
+		itemString := fmt.Sprintf("%s|%t|%s\n", item.Message, item.Done, item.CreatedDate.Format(time.RFC3339))
 		list = list + itemString
 	}
 	return list

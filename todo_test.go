@@ -21,7 +21,7 @@ func TestItem_MarshalText(t *testing.T) {
 			Item:  "Complete this test",
 			Valid: true,
 			Expected: Item{
-				Description:   "Complete this test",
+				Message:       "Complete this test",
 				Done:          false,
 				Priority:      0,
 				CreatedDate:   time.Time{},
@@ -36,7 +36,7 @@ func TestItem_MarshalText(t *testing.T) {
 			Item:  "x Complete this test",
 			Valid: true,
 			Expected: Item{
-				Description:   "Complete this test",
+				Message:       "Complete this test",
 				Done:          true,
 				Priority:      0,
 				CreatedDate:   time.Time{},
@@ -51,7 +51,7 @@ func TestItem_MarshalText(t *testing.T) {
 			Item:  "x 2024-05-18 Complete this test",
 			Valid: true,
 			Expected: Item{
-				Description:   "Complete this test",
+				Message:       "Complete this test",
 				Done:          true,
 				Priority:      0,
 				CreatedDate:   time.Date(2024, 05, 18, 0, 0, 0, 0, time.Local),
@@ -66,7 +66,7 @@ func TestItem_MarshalText(t *testing.T) {
 			Item:  "x 2024-05-18 2024-05-17 Complete this test",
 			Valid: true,
 			Expected: Item{
-				Description:   "Complete this test",
+				Message:       "Complete this test",
 				Done:          true,
 				Priority:      0,
 				CreatedDate:   time.Date(2024, 05, 17, 0, 0, 0, 0, time.Local),
@@ -81,7 +81,7 @@ func TestItem_MarshalText(t *testing.T) {
 			Item:  "x 2024-05-18 2024-05-17 Complete this test +todoProject",
 			Valid: true,
 			Expected: Item{
-				Description:   "Complete this test +todoProject",
+				Message:       "Complete this test +todoProject",
 				Done:          true,
 				Priority:      0,
 				CreatedDate:   time.Date(2024, 05, 17, 0, 0, 0, 0, time.Local),
@@ -96,7 +96,7 @@ func TestItem_MarshalText(t *testing.T) {
 			Item:  "x 2024-05-18 2024-05-17 Complete this test @todoContext",
 			Valid: true,
 			Expected: Item{
-				Description:   "Complete this test @todoContext",
+				Message:       "Complete this test @todoContext",
 				Done:          true,
 				Priority:      0,
 				CreatedDate:   time.Date(2024, 05, 17, 0, 0, 0, 0, time.Local),
@@ -111,7 +111,7 @@ func TestItem_MarshalText(t *testing.T) {
 			Item:  "x 2024-05-18 2024-05-17 Complete this test key:value",
 			Valid: true,
 			Expected: Item{
-				Description:   "Complete this test key:value",
+				Message:       "Complete this test key:value",
 				Done:          true,
 				Priority:      0,
 				CreatedDate:   time.Date(2024, 05, 17, 0, 0, 0, 0, time.Local),

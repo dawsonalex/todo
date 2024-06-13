@@ -24,7 +24,7 @@ func (delegate itemDelegate) Height() int  { return 1 }
 func (delegate itemDelegate) Spacing() int { return 0 }
 
 func (delegate itemDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
-	_, ok := m.SelectedItem().(item)
+	selectedItem, ok := m.SelectedItem().(item)
 	if !ok {
 		return nil
 	}
@@ -33,7 +33,9 @@ func (delegate itemDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, delegate.keys.toggleDone):
-			// TODO: This needs to toggle the item, I think
+			i := m.Index()
+			selectedItem.Done = !selectedItem.Done
+			return m.SetItem(i, selectedItem)
 
 		}
 	}
@@ -50,7 +52,7 @@ func (delegate itemDelegate) Render(w io.Writer, m list.Model, index int, listIt
 		return
 	}
 
-	str := fmt.Sprintf("%d. %s", index+1, i.Description)
+	str := fmt.Sprintf("%d. %s", index+1, i.Message)
 
 	fn := itemStyle.Render
 	if index == m.Index() {
