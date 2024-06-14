@@ -55,7 +55,7 @@ type Item struct {
 	CompletedDate time.Time         `json:"completed-date"`
 	Projects      []string          `json:"projects"`
 	Contexts      []string          `json:"contexts"`
-	SpecialKeys   map[string]string `json:"special-keys"` // Not uesd, but should be preserved for other tools.
+	SpecialKeys   map[string]string `json:"special-keys"` // Not used, but should be preserved for other tools.
 }
 
 func (i *Item) MarshalText() (text []byte, err error) {
