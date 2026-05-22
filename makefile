@@ -1,24 +1,25 @@
-BINARY ?= $(shell basename "$(PWD)")# binary name
-CMD := $(wildcard cmd/*.go)
-temp = $(subst /, ,$@)
-os = $(word 1, $(temp))
-arch = $(word 2, $(temp))
+.PHONY: help build run test clean
+GO_MODULE_PATH = asciify
 
-.PHONY: run
-run:
-	go run cmd/*
+# ROOT_DIR is the path of the makefile (including trailing slash)
+ROOT_DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
+PROJECT_PATH := $(ROOT_DIR:/=)
+BIN_NAME = todo
 
-# Clean the build directory (before committing code, for example)
-.PHONY: clean
-clean: 
-	rm -rv bin
+help: ## Display this help message
+	@echo "Available targets:"
+	@awk 'BEGIN {FS = ":.*##"; printf "\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
-PLATFORMS := linux/amd64 windows/amd64 darwin/amd64 darwin/arm64
+##@ General
 
-release: $(PLATFORMS)
+build: ## Build the binary
+	go build -C '${ROOT_DIR}cmd' -o '${ROOT_DIR}${BIN_NAME}'
 
-$(PLATFORMS):
-	GOOS=$(os) GOARCH=$(arch) go build -o 'bin/$(BINARY)-$(os)-$(arch)' $(CMD)
+run: build ## Build and run the binary bin/imageservice
+	${ROOT_DIR}/${BIN_NAME}
 
-.PHONY: release $(PLATFORMS)
+test: ## run all tests
+	go test ${GO_MODULE_PATH}/...
 
+clean: ## remove build files
+	rm -rv '${ROOT_DIR}${BIN_NAME}'
