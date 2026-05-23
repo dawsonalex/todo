@@ -197,6 +197,6 @@ func printItems(items []todo.Item) {
 }
 
 func fatalf(format string, args ...any) {
-	fmt.Fprintf(os.Stderr, "todo: "+format+"\n", args...)
+	_, _ = fmt.Fprintf(os.Stderr, "todo: "+format+"\n", args...)
 	os.Exit(1)
 }
