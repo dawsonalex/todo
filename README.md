@@ -21,6 +21,7 @@ one or more positional arguments (or pipe lines via stdin) to add items.
 | `-s <field>` | `created` | Sort field: `priority`, `created`, or `completed` |
 | `-q <term>` | | Filter term — repeatable, matched with AND logic (e.g. `-q @work -q +project`) |
 | `-done` | | Include completed items in output |
+| `-v` | | Print the resolved todo.txt path before any output |
 
 ### File resolution
 

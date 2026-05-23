@@ -28,12 +28,17 @@ func main() {
 	sortField := flag.String("s", "created", "sort field: priority, created, completed")
 	filePath := flag.String("f", "", "path to todo.txt file (overrides TODO_FILE env var)")
 	showDone := flag.Bool("done", false, "include completed items in output")
+	verbose := flag.Bool("v", false, "print the resolved todo.txt path")
 	flag.Var(&queries, "q", "filter term, repeatable with AND logic (e.g. -q @work -q +project)")
 	flag.Parse()
 
 	path, err := resolvePath(*filePath)
 	if err != nil {
 		fatalf("resolving path: %v", err)
+	}
+
+	if *verbose {
+		fmt.Printf("todo file: %s\n", path)
 	}
 
 	list, err := todo.ReadFile(path)
