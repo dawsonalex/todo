@@ -2,8 +2,10 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -24,74 +26,96 @@ func (q *queryFlag) Set(s string) error {
 }
 
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "completion" {
-		runCompletion(os.Args[2:])
-		return
+	// Resolve piped stdin here so run() receives nil when stdin is a terminal.
+	var stdin io.Reader
+	if isStdinPiped() {
+		stdin = os.Stdin
+	}
+	os.Exit(run(os.Args[1:], stdin, os.Stdout, os.Stderr))
+}
+
+func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "completion" {
+		runCompletion(args[1:])
+		return 0
 	}
 
-	flag.Usage = func() {
-		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Usage:\n  todo [flags] [item...]\n  todo completion <shell>\n\nSubcommands:\n  completion <shell>   print the tab-completion script for bash, fish, or zsh\n\nFlags:\n")
-		flag.PrintDefaults()
+	fs := flag.NewFlagSet("todo", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	fs.Usage = func() {
+		_, _ = fmt.Fprintf(stderr, "Usage:\n  todo [flags] [item...]\n  todo completion <shell>\n\nSubcommands:\n  completion <shell>   print the tab-completion script for bash, fish, or zsh\n\nFlags:\n")
+		fs.PrintDefaults()
 	}
 
 	var queries queryFlag
-	sortField := flag.String("s", "created", "sort field: priority, created, completed")
-	filePath := flag.String("f", "", "path to todo.txt file (overrides TODO_FILE env var)")
-	showDone := flag.Bool("done", false, "include completed items in output")
-	verbose := flag.Bool("v", false, "print the resolved todo.txt path")
-	completeWord := flag.String("complete", "", "output tab completions for word (used by shell completion scripts)")
-	flag.Var(&queries, "q", "filter term, repeatable with AND logic (e.g. -q @work -q +project)")
-	flag.Parse()
+	sortField := fs.String("s", "created", "sort field: priority, created, completed")
+	filePath := fs.String("f", "", "path to todo.txt file (overrides TODO_FILE env var)")
+	showDone := fs.Bool("done", false, "include completed items in output")
+	verbose := fs.Bool("v", false, "print the resolved todo.txt path")
+	completeWord := fs.String("complete", "", "output tab completions for word (used by shell completion scripts)")
+	fs.Var(&queries, "q", "filter term, repeatable with AND logic (e.g. -q @work -q +project)")
+
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 1
+	}
 
 	path, err := resolvePath(*filePath)
 	if err != nil {
-		fatalf("resolving path: %v", err)
+		_, _ = fmt.Fprintf(stderr, "todo: resolving path: %v\n", err)
+		return 1
 	}
 
 	if *completeWord != "" {
 		handleCompletion(*completeWord, path)
+		return 0
 	}
 
 	if *verbose {
-		fmt.Printf("todo file: %s\n", path)
+		_, _ = fmt.Fprintf(stdout, "todo file: %s\n", path)
 	}
 
 	list, err := todo.ReadFile(path)
 	if err != nil {
-		fatalf("reading %s: %v", path, err)
+		_, _ = fmt.Fprintf(stderr, "todo: reading %s: %v\n", path, err)
+		return 1
 	}
 
-	// Determine whether we are in add mode (stdin pipe or positional args).
 	adding := false
 
-	if isStdinPiped() {
-		if err := addFromReader(list, os.Stdin); err != nil {
-			fatalf("reading stdin: %v", err)
+	if stdin != nil {
+		if err := addFromReader(list, stdin); err != nil {
+			_, _ = fmt.Fprintf(stderr, "todo: reading stdin: %v\n", err)
+			return 1
 		}
 		adding = true
 	}
 
-	if args := flag.Args(); len(args) > 0 {
-		for _, arg := range args {
-			if err := addItem(list, arg); err != nil {
-				fatalf("parsing item %q: %v", arg, err)
-			}
+	if posArgs := fs.Args(); len(posArgs) > 0 {
+		text := strings.Join(posArgs, " ")
+		if err := addItem(list, text); err != nil {
+			_, _ = fmt.Fprintf(stderr, "todo: parsing item %q: %v\n", text, err)
+			return 1
 		}
 		adding = true
 	}
 
 	if adding {
 		if err := todo.WriteFile(path, list); err != nil {
-			fatalf("writing %s: %v", path, err)
+			_, _ = fmt.Fprintf(stderr, "todo: writing %s: %v\n", path, err)
+			return 1
 		}
-		return
+		return 0
 	}
 
 	// List mode: filter, sort, print.
 	items := list.GetAll()
 	items = filterItems(items, queries, *showDone)
 	items = sortItems(items, *sortField)
-	printItems(items)
+	printItems(items, stdout)
+	return 0
 }
 
 // resolvePath returns the todo.txt path to use: -f flag > TODO_FILE env > ~/todo.txt.
@@ -119,7 +143,7 @@ func isStdinPiped() bool {
 }
 
 // addFromReader reads newline-delimited todo.txt lines from r and adds them to the list.
-func addFromReader(list *todo.List, r *os.File) error {
+func addFromReader(list *todo.List, r io.Reader) error {
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -202,16 +226,11 @@ func sortItems(items []todo.Item, field string) []todo.Item {
 	return items
 }
 
-func printItems(items []todo.Item) {
-	w := bufio.NewWriter(os.Stdout)
+func printItems(items []todo.Item, w io.Writer) {
+	bw := bufio.NewWriter(w)
 	for _, item := range items {
 		text, _ := item.MarshalText()
-		_, _ = fmt.Fprintf(w, "%s\n", text)
+		_, _ = fmt.Fprintf(bw, "%s\n", text)
 	}
-	_ = w.Flush()
-}
-
-func fatalf(format string, args ...any) {
-	_, _ = fmt.Fprintf(os.Stderr, "todo: "+format+"\n", args...)
-	os.Exit(1)
+	_ = bw.Flush()
 }
