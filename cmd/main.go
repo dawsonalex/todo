@@ -24,17 +24,32 @@ func (q *queryFlag) Set(s string) error {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "completion" {
+		runCompletion(os.Args[2:])
+		return
+	}
+
+	flag.Usage = func() {
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Usage:\n  todo [flags] [item...]\n  todo completion <shell>\n\nSubcommands:\n  completion <shell>   print the tab-completion script for bash, fish, or zsh\n\nFlags:\n")
+		flag.PrintDefaults()
+	}
+
 	var queries queryFlag
 	sortField := flag.String("s", "created", "sort field: priority, created, completed")
 	filePath := flag.String("f", "", "path to todo.txt file (overrides TODO_FILE env var)")
 	showDone := flag.Bool("done", false, "include completed items in output")
 	verbose := flag.Bool("v", false, "print the resolved todo.txt path")
+	completeWord := flag.String("complete", "", "output tab completions for word (used by shell completion scripts)")
 	flag.Var(&queries, "q", "filter term, repeatable with AND logic (e.g. -q @work -q +project)")
 	flag.Parse()
 
 	path, err := resolvePath(*filePath)
 	if err != nil {
 		fatalf("resolving path: %v", err)
+	}
+
+	if *completeWord != "" {
+		handleCompletion(*completeWord, path)
 	}
 
 	if *verbose {

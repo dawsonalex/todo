@@ -8,10 +8,17 @@ A command-line tool for managing a [todo.txt](http://todotxt.org/) file.
 
 ```
 todo [flags] [item...]
+todo completion <shell>
 ```
 
 Without positional arguments, `todo` lists the contents of your todo file. Pass
 one or more positional arguments (or pipe lines via stdin) to add items.
+
+### Subcommands
+
+| Subcommand | Description |
+|------------|-------------|
+| `completion <shell>` | Print the tab-completion script for `bash`, `fish`, or `zsh` |
 
 ### Flags
 
@@ -49,6 +56,32 @@ cat new-items.txt | todo
 # Show completed items too
 todo -done
 ```
+
+## Shell Completion
+
+`todo` supports tab-completion for `@context` and `+project` tags using
+fuzzy (subsequence) matching — typing `@wk` will match `@work`.
+
+Generate and install the completion script for your shell:
+
+```sh
+# zsh — add to fpath before compinit
+mkdir -p ~/.zsh/completions
+todo completion zsh > ~/.zsh/completions/_todo
+# In ~/.zshrc, before compinit: fpath=(~/.zsh/completions $fpath)
+exec zsh
+
+# bash
+todo completion bash > ~/.bash_completion.d/todo
+source ~/.bash_completion.d/todo  # add this line to ~/.bashrc for future sessions
+
+# fish
+todo completion fish > ~/.config/fish/completions/todo.fish
+```
+
+Once installed, pressing Tab after `@` or `+` (anywhere in the argument)
+shows matching tags from your todo file. The `-f` flag is respected: if you
+type `todo -f ~/work.txt @`, completions are drawn from `~/work.txt`.
 
 ## Development
 
