@@ -14,11 +14,11 @@ help: ## Display this help message
 
 lint: ## Run golangci-lint
 	@echo "Running golangci-lint..."
-	@golangci-lint run --timeout=5m
+	@go tool golangci-lint run --timeout=5m
 
 fmt: ## Format Go code
 	@echo "Formatting code..."
-	@golangci-lint fmt ./...
+	@go tool golangci-lint fmt ./...
 
 vet: ## Run go vet
 	@echo "Running go vet..."

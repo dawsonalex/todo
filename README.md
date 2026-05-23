@@ -1,26 +1,72 @@
-# ToDo
+# todo
 
 ![example workflow](https://github.com/dawsonalex/todo/workflows/Build/badge.svg)
 
-A cli todo list
+A command-line tool for managing a [todo.txt](http://todotxt.org/) file.
 
-## Makefile Usage
+## Usage
 
-Use `make release` to build the application, which outputs the executable to the `bin` dir. The `bin` dir
-is under `.gitignore` so binaries will not be tracked by git.
+```
+todo [flags] [item...]
+```
 
-To remove binaries run `make clean`.
+Without positional arguments, `todo` lists the contents of your todo file. Pass
+one or more positional arguments (or pipe lines via stdin) to add items.
 
-## GitHub Workflow
+### Flags
 
-The GitHub workflow defined in `base.yml` attempts to do some common things in a simple way. Currently, it does the
-following steps under a single job called `Build`:
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-f <path>` | `~/todo.txt` | Path to the todo.txt file (overrides `TODO_FILE` env var) |
+| `-s <field>` | `created` | Sort field: `priority`, `created`, or `completed` |
+| `-q <term>` | | Filter term — repeatable, matched with AND logic (e.g. `-q @work -q +project`) |
+| `-done` | | Include completed items in output |
 
-    - Set up Go environment.
-    - Run Go Tests (ignoring if there are none).
-    - Runs `make release` to create all binaries.
-    - Bump the version based on the commit message.
-        - Use `#major`, `#minor`, or `#patch` in your commit message to bump the version and create a new release.
-        - Leaving out the above tags will not create a new tag or release version.
-    - Generate release logs from the commits between this tag and the last.
-    - Create a GitHub release and upload the content of `bin`.
+### File resolution
+
+The todo file is resolved in this order:
+
+1. `-f` flag
+2. `TODO_FILE` environment variable
+3. `~/todo.txt`
+
+### Examples
+
+```sh
+# List all incomplete items, sorted by creation date (default)
+todo
+
+# List items tagged @work, sorted by priority
+todo -s priority -q @work
+
+# Add an item from a positional argument
+todo "(A) 2026-05-23 Fix the critical bug +work @laptop"
+
+# Add items from a file
+cat new-items.txt | todo
+
+# Show completed items too
+todo -done
+```
+
+## Development
+
+### Prerequisites
+
+- Go 1.25+
+
+golangci-lint is declared as a `tool` dependency in `go.mod` and is fetched automatically by `go tool` — no separate install required.
+
+### Common tasks
+
+| Command | Description |
+|---------|-------------|
+| `make build` | Build the `todo` binary |
+| `make run` | Build and run the binary |
+| `make test` | Run tests with race detection and coverage |
+| `make fmt` | Format Go code |
+| `make vet` | Run `go vet` |
+| `make lint` | Run `go tool golangci-lint` |
+| `make commit-check` | Run all checks (fmt, vet, lint, test) — use before committing |
+| `make clean` | Remove build artifacts |
+| `make help` | List all available targets |
