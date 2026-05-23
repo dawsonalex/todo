@@ -65,12 +65,18 @@ func (i *Item) UnmarshalText(text []byte) error {
 	if textString[nextPosition] == 'x' {
 		i.Done = true
 		nextPosition += 2
+		if nextPosition > len(textString) {
+			nextPosition = len(textString)
+		}
 	}
 
-	// optional priority: "(A) "
-	if nextPosition < len(textString) && textString[nextPosition] == '(' {
+	// optional priority: "(A) " — requires at least 2 bytes at nextPosition to read the letter
+	if nextPosition+1 < len(textString) && textString[nextPosition] == '(' {
 		i.Priority = Priority(text[nextPosition+1])
 		nextPosition += 4 // skip "(A) "
+		if nextPosition > len(textString) {
+			nextPosition = len(textString)
+		}
 	}
 
 	// optional completion and/or creation date
