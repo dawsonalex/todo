@@ -1,51 +1,23 @@
 package todo
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
-	"strconv"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 )
 
-type WritableProperty func(item Item) Item
-
-func Message(message string) WritableProperty {
-	return func(item Item) Item {
-		item.Message = message
-		return item
-	}
-}
-
-func ToggleDone() WritableProperty {
-	return func(item Item) Item {
-		item.Done = !item.Done
-		return item
-	}
-}
-
-func Done() WritableProperty {
-	return func(item Item) Item {
-		item.Done = true
-		return item // comment thingkjaflkjdsflkjlaksdjflkjadsf
-	}
-}
-
-func NotDone() WritableProperty {
-	return func(item Item) Item {
-		item.Done = false
-		return item
-	}
-}
-
-type Id int
-
 type Priority rune
 
 func (p Priority) Valid() bool {
-	return p > 'A' && p < 'Z'
+	return p >= 'A' && p <= 'Z'
 }
+
+type Id int
 
 type Item struct {
 	Message       string            `json:"description"`
@@ -59,36 +31,29 @@ type Item struct {
 }
 
 func (i *Item) MarshalText() (text []byte, err error) {
-	var textStr string
+	var parts []string
+
 	if i.Done {
-		textStr = "x"
+		parts = append(parts, "x")
 	}
 
-	// only output completed date if the created date exists
+	if i.Priority.Valid() {
+		parts = append(parts, fmt.Sprintf("(%c)", rune(i.Priority)))
+	}
+
 	if !i.CreatedDate.IsZero() {
-		textStr = textStr + i.CompletedDate.Format("2006-01-02") + " " + i.CreatedDate.Format("2006-01-02")
+		if !i.CompletedDate.IsZero() {
+			parts = append(parts, i.CompletedDate.Format("2006-01-02"))
+		}
+		parts = append(parts, i.CreatedDate.Format("2006-01-02"))
 	}
 
-	textStr = textStr + " " + i.Message
+	parts = append(parts, i.Message)
 
-	for _, project := range i.Projects {
-		textStr = textStr + " +" + project
-	}
-
-	for _, context := range i.Contexts {
-		textStr = textStr + " @" + context
-	}
-
-	for key, value := range i.SpecialKeys {
-		textStr = textStr + fmt.Sprintf(" %s:%s", key, value)
-	}
-
-	return []byte(textStr), nil
+	return []byte(strings.Join(parts, " ")), nil
 }
 
 func (i *Item) UnmarshalText(text []byte) error {
-
-	// TODO: Parse a line into an item
 	textString := string(text)
 	if len(textString) == 0 {
 		return errors.New("no item found in text")
@@ -99,48 +64,40 @@ func (i *Item) UnmarshalText(text []byte) error {
 	// lowercase x indicates item is done
 	if textString[nextPosition] == 'x' {
 		i.Done = true
-
-		// next position is characters ahead
 		nextPosition += 2
 	}
 
-	// optional priority
-	if textString[nextPosition] == '(' {
+	// optional priority: "(A) "
+	if nextPosition < len(textString) && textString[nextPosition] == '(' {
 		i.Priority = Priority(text[nextPosition+1])
-
-		// move cursor past (A)
-		nextPosition += 3
+		nextPosition += 4 // skip "(A) "
 	}
 
-	// optional completion date
-	if firstDate, err := time.ParseInLocation("2006-01-02", textString[nextPosition:nextPosition+10], time.Local); err == nil {
-		// move cursor to after first valid date
-		nextPosition += 11
-
-		// If the next set of chars is a date, this is the creation date
-		if createdDate, err := time.ParseInLocation("2006-01-02", textString[nextPosition:nextPosition+10], time.Local); err == nil {
-			i.CreatedDate = createdDate
-			i.CompletedDate = firstDate
-
+	// optional completion and/or creation date
+	if nextPosition+10 <= len(textString) {
+		if firstDate, err := time.ParseInLocation("2006-01-02", textString[nextPosition:nextPosition+10], time.Local); err == nil {
 			nextPosition += 11
-		} else {
-			// If we only have one date, it's the created date
-			i.CreatedDate = firstDate
+
+			if nextPosition+10 <= len(textString) {
+				if createdDate, err := time.ParseInLocation("2006-01-02", textString[nextPosition:nextPosition+10], time.Local); err == nil {
+					i.CreatedDate = createdDate
+					i.CompletedDate = firstDate
+					nextPosition += 11
+				} else {
+					i.CreatedDate = firstDate
+				}
+			} else {
+				i.CreatedDate = firstDate
+			}
 		}
 	}
 
-	// everything else is description with optional tags and context
 	i.Message = textString[nextPosition:]
-
-	projects, contexts, specialKeys := parseMessage(textString[nextPosition:])
-	i.Projects = projects
-	i.Contexts = contexts
-	i.SpecialKeys = specialKeys
+	i.Projects, i.Contexts, i.SpecialKeys = parseMessage(textString[nextPosition:])
 
 	return nil
 }
 
-// parseMessage parses a
 func parseMessage(message string) (projects []string, contexts []string, specialKeys map[string]string) {
 	for _, word := range strings.Fields(message) {
 		if word[0] == '+' {
@@ -165,60 +122,16 @@ func parseMessage(message string) (projects []string, contexts []string, special
 
 type itemList []*Item
 
+// List is a list of todo items. List is safe for concurrent use.
 type List struct {
 	sync.RWMutex
-	// todo: this could do with indexing based on message and date at some point
 	list itemList
 }
 
-func NewListFromDeserialised(serialisedList string) *List {
-	if len(serialisedList) == 0 {
-		return &List{
-			list: make(itemList, 0),
-		}
-	}
-
-	serialisedItems := strings.Split(serialisedList, "\n")
-	list := List{
-		list: make(itemList, len(serialisedItems)),
-	}
-	for i, serialisedItem := range serialisedItems {
-		itemParts := strings.Split(serialisedItem, "|")
-		done, _ := strconv.ParseBool(itemParts[1])
-		timestamp, _ := time.Parse(time.RFC3339, itemParts[2])
-		list.list[i] = &Item{
-			//Id:          Id(i),
-			Message:     itemParts[0],
-			Done:        done,
-			CreatedDate: timestamp,
-		}
-	}
-	return &list
-}
-
-// SerialiseToString returns the string serialisation of a list.
-// This contains each item in the list in the format:
-// message|done|timestamp
-// each item is separated by a newline.
-func (l *List) SerialiseToString() string {
-	var list string
-	for _, item := range l.list {
-		itemString := fmt.Sprintf("%s|%t|%s\n", item.Message, item.Done, item.CreatedDate.Format(time.RFC3339))
-		list = list + itemString
-	}
-	return list
-}
-
-func (l *List) Add(properties ...WritableProperty) Item {
+func (l *List) Add(item Item) Item {
 	l.Lock()
 	defer l.Unlock()
 
-	item := Item{
-		//Id: Id(len(l.list)),
-	}
-	for _, property := range properties {
-		item = property(item)
-	}
 	l.list = append(l.list, &item)
 	return item
 }
@@ -231,11 +144,20 @@ func (l *List) Remove(id Id) {
 }
 
 func (l *List) Get(id Id) (Item, bool) {
-	item, exists := l.get(id)
-	return *item, exists
+	l.RLock()
+	defer l.RUnlock()
+
+	idx := int(id)
+	if idx < 0 || idx >= len(l.list) {
+		return Item{}, false
+	}
+	return *l.list[idx], true
 }
 
 func (l *List) GetAll() []Item {
+	l.RLock()
+	defer l.RUnlock()
+
 	items := make([]Item, len(l.list))
 	for i, item := range l.list {
 		items[i] = *item
@@ -243,31 +165,70 @@ func (l *List) GetAll() []Item {
 	return items
 }
 
-func (l *List) get(itemId Id) (*Item, bool) {
-	l.RLock()
-	defer l.RUnlock()
-
-	id := int(itemId)
-	if id < 0 || id > len(l.list) {
-		return nil, false
+// ReadFile reads a todo.txt file and returns a List.
+// Returns an empty list if the file does not exist.
+func ReadFile(path string) (*List, error) {
+	path = filepath.Clean(path)
+	f, err := os.Open(path)
+	if os.IsNotExist(err) {
+		return &List{list: make(itemList, 0)}, nil
 	}
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
 
-	item := l.list[id]
-	return item, true
+	list := &List{list: make(itemList, 0)}
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		var item Item
+		if err := item.UnmarshalText([]byte(line)); err != nil {
+			continue
+		}
+		list.list = append(list.list, &item)
+	}
+	return list, scanner.Err()
 }
 
-func (l *List) Update(id Id, props ...WritableProperty) (Item, bool) {
-	l.Lock()
-	defer l.Unlock()
+// WriteFile writes all items in the list to path in todo.txt format.
+// The write is atomic: a temp file is written then renamed into place.
+func WriteFile(path string, list *List) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		return err
+	}
 
-	item, exists := l.get(id)
-	if !exists {
-		return Item{}, false
+	tmpPath := filepath.Clean(path + ".tmp")
+	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
 	}
-	updatedItem := *item
-	for _, prop := range props {
-		updatedItem = prop(*item)
+
+	list.RLock()
+	w := bufio.NewWriter(f)
+	writeErr := func() error {
+		for _, item := range list.list {
+			text, err := item.MarshalText()
+			if err != nil {
+				return err
+			}
+			if _, err := fmt.Fprintf(w, "%s\n", text); err != nil {
+				return err
+			}
+		}
+		return w.Flush()
+	}()
+	list.RUnlock()
+
+	if closeErr := f.Close(); closeErr != nil && writeErr == nil {
+		writeErr = closeErr
 	}
-	l.list[id] = &updatedItem
-	return updatedItem, true
+	if writeErr != nil {
+		_ = os.Remove(tmpPath)
+		return writeErr
+	}
+	return os.Rename(tmpPath, path)
 }
