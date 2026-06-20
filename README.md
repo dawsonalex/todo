@@ -36,7 +36,8 @@ The todo file is resolved in this order:
 
 1. `-f` flag
 2. `TODO_FILE` environment variable
-3. `~/todo.txt`
+3. `$PWD/todo.txt`
+4. `~/todo.txt`
 
 ### Examples
 
