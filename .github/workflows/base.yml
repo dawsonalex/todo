@@ -83,10 +83,8 @@ jobs:
           NEW_TAG: ${{ steps.version.outputs.new_tag }}
         run: |
           set -euo pipefail
-          # First line of the HEAD commit doubles as the release title.
-          TITLE="$(git log -1 --format='%s' "$GITHUB_SHA")"
           gh release create "$NEW_TAG" \
             --target "$GITHUB_SHA" \
-            --title "$TITLE" \
+            --title "$NEW_TAG" \
             --notes-file release_notes.md \
             dist/*
