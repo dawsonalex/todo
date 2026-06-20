@@ -62,7 +62,12 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	path, err := resolvePath(*filePath)
+	pwd, err := os.Getwd()
+	if err != nil {
+		pwd = ""
+	}
+
+	path, err := resolvePath(pwd, *filePath)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "todo: resolving path: %v\n", err)
 		return 1
@@ -118,14 +123,25 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// resolvePath returns the todo.txt path to use: -f flag > TODO_FILE env > ~/todo.txt.
-func resolvePath(flagVal string) (string, error) {
+// resolvePath returns the todo.txt path to use: -f flag > TODO_FILE env > ./todo.txt > ~/todo.txt.
+func resolvePath(pwd, flagVal string) (string, error) {
 	if flagVal != "" {
 		return flagVal, nil
 	}
 	if env, ok := os.LookupEnv("TODO_FILE"); ok && env != "" {
 		return env, nil
 	}
+	if pwd != "" {
+		filePath := filepath.Join(pwd, "todo.txt")
+		if _, err := os.Stat(filePath); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				return "", err
+			}
+		} else {
+			return filePath, nil
+		}
+	}
+
 	u, err := user.Current()
 	if err != nil {
 		return "", fmt.Errorf("looking up home directory: %w", err)
