@@ -31,7 +31,7 @@ commit-check: fmt vet lint test ## Run all checks before committing
 
 test: ## Run tests
 	@echo "Running tests..."
-	@go test -v -race -coverprofile=coverage.out ./...
+	@go test -v -race ./...
 
 build: ## Build the binary
 	go build -C '${ROOT_DIR}cmd' -o '${ROOT_DIR}${BIN_NAME}'
