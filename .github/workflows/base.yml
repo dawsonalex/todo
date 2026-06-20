@@ -1,48 +1,92 @@
-name: Build
+name: Release
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
 
+# Prevent two pushes in quick succession from racing on tag creation.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
-
-  build:
+  # ---------------------------------------------------------------------------
+  # Gate: linting + unit tests must pass (via the makefile) before any release.
+  # ---------------------------------------------------------------------------
+  verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v5
         with:
-          go-version: 1.17
+          go-version-file: go.mod
+          cache: true
+
+      - name: Lint
+        run: make lint
 
       - name: Test
-        run: go test -v ./...
+        run: make test
 
-      - name: Compile
-        run: make release
-
-      - name: Bump version and push tag
-        id: bump_version
-        uses: anothrNick/github-tag-action@1.36.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WITH_V: false
-          DEFAULT_BUMP: none
-
-      - name: Changelog
-        uses: Bullrich/generate-release-changelog@master
-        id: changelog
-        env:
-          REPO: ${{ github.repository }}
-
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        if: ${{ steps.bump_version.outputs.part != '' }}
+  # ---------------------------------------------------------------------------
+  # Release: only on main, only after verify passes. Pure git + gh CLI, no
+  # third-party actions. Computes the next semver from commit keywords and
+  # publishes a GitHub Release.
+  # ---------------------------------------------------------------------------
+  release:
+    needs: verify
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write   # required to create tags and releases
+    steps:
+      - uses: actions/checkout@v4
         with:
-          tag_name: ${{ steps.bump_version.outputs.new_tag }}
-          body: |
-            ${{ steps.changelog.outputs.changelog }}
-          files: bin/**
+          fetch-depth: 0       # full history so we can diff against the last tag
+          fetch-tags: true
+
+      - name: Determine next version
+        id: version
+        run: ./scripts/next-version.sh >> "$GITHUB_OUTPUT"
+
+      - name: Set up Go
+        if: steps.version.outputs.release == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build release binaries
+        if: steps.version.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.new_tag }}
+        run: ./scripts/build-release.sh
+
+      - name: Build release notes
+        if: steps.version.outputs.release == 'true'
+        env:
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+          RANGE: ${{ steps.version.outputs.range }}
+          PREV_TAG: ${{ steps.version.outputs.prev_tag }}
+        run: ./scripts/release-notes.sh > release_notes.md
+
+      - name: Create release
+        if: steps.version.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEW_TAG: ${{ steps.version.outputs.new_tag }}
+        run: |
+          set -euo pipefail
+          # First line of the HEAD commit doubles as the release title.
+          TITLE="$(git log -1 --format='%s' "$GITHUB_SHA")"
+          gh release create "$NEW_TAG" \
+            --target "$GITHUB_SHA" \
+            --title "$TITLE" \
+            --notes-file release_notes.md \
+            dist/*

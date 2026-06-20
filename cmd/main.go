@@ -16,6 +16,10 @@ import (
 	"github.com/dawsonalex/todo"
 )
 
+// version is the build version, overridden at release time via
+// -ldflags "-X main.version=...". Defaults to "dev" for local builds.
+var version = "dev"
+
 // queryFlag is a repeatable -q flag value.
 type queryFlag []string
 
@@ -43,11 +47,12 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("todo", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		_, _ = fmt.Fprintf(stderr, "Usage:\n  todo [flags] [item...]\n  todo completion <shell>\n\nSubcommands:\n  completion <shell>   print the tab-completion script for bash, fish, or zsh\n\nFlags:\n")
+		_, _ = fmt.Fprintf(stderr, "Usage:\n  todo [flags] [item...]\n  todo completion <shell>\n  todo -version\n\nSubcommands:\n  completion <shell>   print the tab-completion script for bash, fish, or zsh\n\nFlags:\n")
 		fs.PrintDefaults()
 	}
 
 	var queries queryFlag
+	showVersion := fs.Bool("version", false, "print the version and exit")
 	sortField := fs.String("s", "created", "sort field: priority, created, completed")
 	filePath := fs.String("f", "", "path to todo.txt file (overrides TODO_FILE env var)")
 	showDone := fs.Bool("done", false, "include completed items in output")
@@ -60,6 +65,11 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 0
 		}
 		return 1
+	}
+
+	if *showVersion {
+		_, _ = fmt.Fprintf(stdout, "todo %s\n", version)
+		return 0
 	}
 
 	pwd, err := os.Getwd()

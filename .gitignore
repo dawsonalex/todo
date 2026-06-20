@@ -4,3 +4,5 @@ bin
 /coverage.out
 /todo
 /todo.txt
+/dist
+/release_notes.md
